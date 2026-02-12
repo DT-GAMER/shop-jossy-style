@@ -61,11 +61,21 @@ export default function ProductDetail() {
         <div className="grid gap-8 md:grid-cols-2">
           {/* Image */}
           <div className="overflow-hidden rounded-xl bg-muted">
-            <img
-              src={product.images[0]}
-              alt={product.name}
-              className="h-full w-full object-cover"
-            />
+            <div className="relative">
+              <img
+                src={product.images[0]}
+                alt={product.name}
+                className="h-full w-full object-cover"
+              />
+              {product.images.length > 1 && (
+                <button
+                  onClick={() => setQuantity(q => (q % product.images.length) + 1)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white transition-colors hover:bg-black/70"
+                >
+                  <ArrowLeft className="h-4 w-4 rotate-180" />
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Details */}

@@ -1,7 +1,8 @@
+// services/api.ts
 import { Product, ProductCategory, OrderRequest, OrderResponse } from "@/types";
 
 // Base API URL - replace with actual API endpoint
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://magic.myradture.com/api/v1";
 
 // Mock product data for development
 const MOCK_PRODUCTS: Product[] = [
@@ -128,29 +129,34 @@ const MOCK_PRODUCTS: Product[] = [
 ];
 
 // Flag for using mock data vs real API
-const USE_MOCK = true;
+const USE_MOCK = false;
 
 function delay(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// ============ PRODUCTS ENDPOINTS ============
+
 export async function fetchProducts(category?: ProductCategory): Promise<Product[]> {
   if (USE_MOCK) {
     await delay(300);
     if (category) {
-      return MOCK_PRODUCTS.filter(p => p.category === category);
+      return MOCK_PRODUCTS.filter(p => p.category === category && p.inStock === true);
     }
-    return MOCK_PRODUCTS;
+    return MOCK_PRODUCTS.filter(p => p.inStock === true);
   }
 
   const url = category 
     ? `${API_BASE_URL}/products?category=${category}`
     : `${API_BASE_URL}/products`;
+  
   const res = await fetch(url);
   if (!res.ok) throw new Error("Failed to fetch products");
-  return res.json();
+  const data = await res.json();
+  return data;
 }
 
+// Fetch a single product by ID
 export async function fetchProduct(id: string): Promise<Product> {
   if (USE_MOCK) {
     await delay(200);
@@ -164,6 +170,64 @@ export async function fetchProduct(id: string): Promise<Product> {
   return res.json();
 }
 
+
+export async function createProduct(product: Omit<Product, 'id'>): Promise<Product> {
+  if (USE_MOCK) {
+    await delay(500);
+    const newProduct = {
+      ...product,
+      id: crypto.randomUUID(),
+      inStock: product.stockQuantity > 0,
+    };
+    MOCK_PRODUCTS.push(newProduct);
+    return newProduct;
+  }
+
+  const res = await fetch(`${API_BASE_URL}/products`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(product),
+  });
+  if (!res.ok) throw new Error("Failed to create product");
+  return res.json();
+}
+
+export async function updateProduct(id: string, product: Partial<Product>): Promise<Product> {
+  if (USE_MOCK) {
+    await delay(500);
+    const index = MOCK_PRODUCTS.findIndex(p => p.id === id);
+    if (index === -1) throw new Error("Product not found");
+    
+    MOCK_PRODUCTS[index] = { 
+      ...MOCK_PRODUCTS[index], 
+      ...product,
+      inStock: product.stockQuantity !== undefined ? product.stockQuantity > 0 : MOCK_PRODUCTS[index].inStock 
+    };
+    return MOCK_PRODUCTS[index];
+  }
+
+  const res = await fetch(`${API_BASE_URL}/products/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(product),
+  });
+  if (!res.ok) throw new Error("Failed to update product");
+  return res.json();
+}
+
+export async function fetchCategories(): Promise<string[]> {
+  if (USE_MOCK) {
+    await delay(200);
+    const categories = [...new Set(MOCK_PRODUCTS.map(p => p.category))];
+    return categories;
+  }
+
+  const res = await fetch(`${API_BASE_URL}/products/categories`);
+  if (!res.ok) throw new Error("Failed to fetch categories");
+  return res.json();
+}
+
+// ============ ORDERS ENDPOINTS ============
 export async function createOrder(order: OrderRequest): Promise<OrderResponse> {
   if (USE_MOCK) {
     await delay(500);
@@ -194,6 +258,7 @@ export async function createOrder(order: OrderRequest): Promise<OrderResponse> {
   if (!res.ok) throw new Error("Failed to create order");
   return res.json();
 }
+// ============ UTILITY FUNCTIONS ============
 
 export function formatPrice(amount: number): string {
   return new Intl.NumberFormat("en-NG", {
