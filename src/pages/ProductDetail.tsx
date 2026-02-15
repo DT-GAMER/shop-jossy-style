@@ -12,6 +12,7 @@ export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
   const { addToCart } = useCart();
   const [quantity, setQuantity] = useState(1);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   const { data: product, isLoading } = useQuery({
     queryKey: ["product", id],
@@ -47,6 +48,21 @@ export default function ProductDetail() {
     toast.success(`${product.name} added to cart`);
   };
 
+  // Get images array (handle both 'images' and 'media' properties for compatibility)
+  const images = product.images && product.images.length > 0 
+    ? product.images 
+    : product.media || [];
+  
+  const currentImage = images[currentImageIndex] || "/placeholder-image.jpg";
+
+  const nextImage = () => {
+    setCurrentImageIndex((prev) => (prev + 1) % images.length);
+  };
+
+  const prevImage = () => {
+    setCurrentImageIndex((prev) => (prev - 1 + images.length) % images.length);
+  };
+
   return (
     <Layout>
       <div className="container py-6 md:py-10">
@@ -59,26 +75,53 @@ export default function ProductDetail() {
         </Link>
 
         <div className="grid gap-8 md:grid-cols-2">
-          {/* Image */}
+          {/* Image Gallery */}
           <div className="overflow-hidden rounded-xl bg-muted">
-            <div className="relative">
+            <div className="relative aspect-square">
               <img
-                src={product.images[0]}
+                src={currentImage}
                 alt={product.name}
                 className="h-full w-full object-cover"
               />
-              {product.images.length > 1 && (
-                <button
-                  onClick={() => setQuantity(q => (q % product.images.length) + 1)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white transition-colors hover:bg-black/70"
-                >
-                  <ArrowLeft className="h-4 w-4 rotate-180" />
-                </button>
+              
+              {images.length > 1 && (
+                <>
+                  <button
+                    onClick={prevImage}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white transition-colors hover:bg-black/70"
+                    aria-label="Previous image"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={nextImage}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white transition-colors hover:bg-black/70"
+                    aria-label="Next image"
+                  >
+                    <ArrowLeft className="h-4 w-4 rotate-180" />
+                  </button>
+                  
+                  {/* Image indicators */}
+                  <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 gap-1">
+                    {images.map((_, index) => (
+                      <button
+                        key={index}
+                        onClick={() => setCurrentImageIndex(index)}
+                        className={`h-1.5 w-1.5 rounded-full transition-all ${
+                          index === currentImageIndex
+                            ? "w-4 bg-white"
+                            : "bg-white/50 hover:bg-white/80"
+                        }`}
+                        aria-label={`Go to image ${index + 1}`}
+                      />
+                    ))}
+                  </div>
+                </>
               )}
             </div>
           </div>
 
-          {/* Details */}
+          {/* Product Details - Rest of your component remains the same */}
           <div className="flex flex-col">
             <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
               {CATEGORY_LABELS[product.category]}

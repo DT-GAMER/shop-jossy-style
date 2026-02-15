@@ -1,32 +1,120 @@
-import { useLocation, Link, Navigate } from "react-router-dom";
+import { useLocation, Link, Navigate, useParams } from "react-router-dom";
 import { CheckCircle, MessageCircle, Copy } from "lucide-react";
 import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
 import Layout from "@/components/Layout";
 import { OrderResponse, BANK_DETAILS, WHATSAPP_NUMBER } from "@/types";
-import { formatPrice } from "@/services/api";
+import { formatPrice, fetchOrder, fetchProduct } from "@/services/api";
 
 export default function OrderConfirmation() {
   const location = useLocation();
-  const order = location.state?.order as OrderResponse | undefined;
+  const { orderNumber } = useParams<{ orderNumber: string }>();
+  const [copied, setCopied] = useState(false);
+  const [productNames, setProductNames] = useState<Record<string, string>>({});
+  
+  // Get order from navigation state if available
+  const stateOrder = location.state?.order as OrderResponse | undefined;
+  
+  // Fetch order if not in state (e.g., on page refresh)
+  const { data: fetchedOrder, isLoading, error } = useQuery({
+    queryKey: ["order", orderNumber],
+    queryFn: () => fetchOrder(orderNumber!),
+    enabled: !stateOrder && !!orderNumber,
+    retry: 1,
+  });
 
+  // Use state order if available, otherwise use fetched order
+  const order = stateOrder || fetchedOrder;
+
+  // Fetch product names for all items
+  useEffect(() => {
+    async function fetchProductNames() {
+      if (!order?.items) return;
+      
+      const names: Record<string, string> = {};
+      
+      await Promise.all(
+        order.items.map(async (item) => {
+          try {
+            const product = await fetchProduct(item.productId);
+            names[item.productId] = product.name;
+          } catch (error) {
+            console.error(`Failed to fetch product ${item.productId}:`, error);
+            names[item.productId] = `Product (${item.productId.slice(0, 8)})`;
+          }
+        })
+      );
+      
+      setProductNames(names);
+    }
+
+    fetchProductNames();
+  }, [order]);
+
+  // Show loading state while fetching
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="container max-w-lg py-8 md:py-12 text-center">
+          <div className="animate-pulse">
+            <div className="mx-auto h-16 w-16 rounded-full bg-muted"></div>
+            <div className="mt-4 h-8 w-48 mx-auto rounded bg-muted"></div>
+            <div className="mt-2 h-4 w-64 mx-auto rounded bg-muted"></div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // If no order and error, show not found
+  if (!order && error) {
+    return (
+      <Layout>
+        <div className="container max-w-lg py-8 md:py-12 text-center">
+          <p className="text-muted-foreground">Order not found.</p>
+          <Link to="/" className="mt-4 inline-block text-primary underline">
+            Go to Home
+          </Link>
+        </div>
+      </Layout>
+    );
+  }
+
+  // If still no order, redirect
   if (!order) {
     return <Navigate to="/" replace />;
   }
 
   const copyOrderNumber = () => {
     navigator.clipboard.writeText(order.orderNumber);
+    setCopied(true);
     toast.success("Order number copied!");
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const sendWhatsApp = () => {
-    const message = encodeURIComponent(
-      `Hello! I just placed an order.\n\nOrder Number: ${order.orderNumber}\nTotal: ${formatPrice(order.totalAmount)}\n\nI have completed the bank transfer. Please confirm.`
-    );
-    window.open(
-      `https://wa.me/${WHATSAPP_NUMBER.replace(/[^0-9]/g, "")}?text=${message}`,
-      "_blank"
-    );
-  };
+  // Create a formatted list of items
+  const itemsList = order.items
+    .map(item => {
+      const productName = productNames[item.productId] || `Product (${item.productId.slice(0, 8)})`;
+      return `• ${productName} × ${item.quantity} - ${formatPrice(item.priceAtOrder * item.quantity)}`;
+    })
+    .join('\n');
+
+  const message = encodeURIComponent(
+    `Hello! I just placed an order.\n\n`
+    `Order Number: ${order.orderNumber},\n`
+    `Total: ${formatPrice(order.totalAmount)},\n\n`
+    `Items Ordered:\n${itemsList},\n\n`
+    `I have completed the bank transfer. Please confirm.`
+  );
+  
+  window.open(
+    `https://wa.me/${WHATSAPP_NUMBER.replace(/[^0-9]/g, "")}?text=${message}`,
+    "_blank"
+  );
+};
 
   return (
     <Layout>
@@ -59,7 +147,7 @@ export default function OrderConfirmation() {
             </button>
           </div>
           <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-accent/20 px-3 py-1 text-xs font-medium text-accent-foreground">
-            ⏳ Pending Payment
+            ⏳ {order.status === "pending_payment" ? "Pending Payment" : order.status}
           </div>
         </div>
 
@@ -70,10 +158,10 @@ export default function OrderConfirmation() {
             {order.items.map(item => (
               <div key={item.productId} className="flex justify-between text-sm">
                 <span className="text-muted-foreground">
-                  {item.productName} × {item.quantity}
+                  {productNames[item.productId] || `Loading...`} × {item.quantity}
                 </span>
                 <span className="font-medium text-card-foreground">
-                  {formatPrice(item.price * item.quantity)}
+                  {formatPrice(item.priceAtOrder * item.quantity)}
                 </span>
               </div>
             ))}

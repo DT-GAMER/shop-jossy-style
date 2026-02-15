@@ -137,23 +137,41 @@ function delay(ms: number) {
 
 // ============ PRODUCTS ENDPOINTS ============
 
-export async function fetchProducts(category?: ProductCategory): Promise<Product[]> {
-  if (USE_MOCK) {
-    await delay(300);
-    if (category) {
-      return MOCK_PRODUCTS.filter(p => p.category === category && p.inStock === true);
-    }
-    return MOCK_PRODUCTS.filter(p => p.inStock === true);
+export async function fetchProducts(category?: ProductCategory) {
+  const params = new URLSearchParams();
+
+  if (category) {
+    params.append("category", category.toUpperCase());
   }
 
-  const url = category 
-    ? `${API_BASE_URL}/products?category=${category}`
-    : `${API_BASE_URL}/products`;
-  
+  const url = `${API_BASE_URL}/public/products${params.toString() ? `?${params}` : ""
+    }`;
+
   const res = await fetch(url);
-  if (!res.ok) throw new Error("Failed to fetch products");
-  const data = await res.json();
-  return data;
+
+  if (!res.ok) {
+    throw new Error("Failed to fetch products");
+  }
+
+  const raw = await res.json();
+
+  const products = Array.isArray(raw) ? raw : raw.data ?? [];
+  console.log(products)
+
+  return products.map((p: any) => ({
+    id: p.id,
+    name: p.name,
+    price: p.price,
+    category: p.category?.toLowerCase(),
+    description: p.description ?? "",
+    images: Array.isArray(p.images)
+      ? p.images
+      : Array.isArray(p.media)
+        ? p.media.map(item => item.url)
+        : [],
+    stockQuantity: Number(p.available ?? 0),
+    inStock: Number(p.available ?? 0) > 0,
+  }));
 }
 
 // Fetch a single product by ID
@@ -165,9 +183,34 @@ export async function fetchProduct(id: string): Promise<Product> {
     return product;
   }
 
-  const res = await fetch(`${API_BASE_URL}/products/${id}`);
+  const res = await fetch(`${API_BASE_URL}/public/products/${id}`);
   if (!res.ok) throw new Error("Failed to fetch product");
-  return res.json();
+  
+  const raw = await res.json();
+  console.log('Raw product data:', raw);
+  
+  // Transform the product data to match the expected format
+  return {
+    id: raw.data.id,
+    name: raw.data.name,
+    price: raw.data.price,
+    category: raw.data.category?.toLowerCase(),
+    description: raw.data.description ?? "",
+    // Transform images/media to array of URL strings
+    images: Array.isArray(raw.data.images)
+      ? raw.data.images
+      : Array.isArray(raw.data.media)
+        ? raw.data.media.map((item: any) => item.url)
+        : [],
+    // Also keep the images array for the component
+    media: Array.isArray(raw.data.images)
+      ? raw.data.images
+      : Array.isArray(raw.data.media)
+        ? raw.data.media.map((item: any) => item.url)
+        : [],
+    stockQuantity: Number(raw.data.available ?? 0),
+    inStock: Number(raw.data.available ?? 0) > 0,
+  };
 }
 
 
@@ -197,11 +240,11 @@ export async function updateProduct(id: string, product: Partial<Product>): Prom
     await delay(500);
     const index = MOCK_PRODUCTS.findIndex(p => p.id === id);
     if (index === -1) throw new Error("Product not found");
-    
-    MOCK_PRODUCTS[index] = { 
-      ...MOCK_PRODUCTS[index], 
+
+    MOCK_PRODUCTS[index] = {
+      ...MOCK_PRODUCTS[index],
       ...product,
-      inStock: product.stockQuantity !== undefined ? product.stockQuantity > 0 : MOCK_PRODUCTS[index].inStock 
+      inStock: product.stockQuantity !== undefined ? product.stockQuantity > 0 : MOCK_PRODUCTS[index].inStock
     };
     return MOCK_PRODUCTS[index];
   }
@@ -250,13 +293,66 @@ export async function createOrder(order: OrderRequest): Promise<OrderResponse> {
     };
   }
 
+  // Transform the order to match backend expectations
+  const requestBody = {
+    customerName: order.customerName,
+    phone: order.customerPhone,  // Change from customerPhone to phone
+    items: order.items.map(item => ({
+      productId: item.productId,
+      quantity: item.quantity
+    }))
+  };
+
+  console.log('Sending order request:', requestBody); // For debugging
+
   const res = await fetch(`${API_BASE_URL}/orders`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(order),
+    body: JSON.stringify(requestBody),
   });
-  if (!res.ok) throw new Error("Failed to create order");
-  return res.json();
+  
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error('Order creation failed:', res.status, errorText);
+    throw new Error("Failed to create order");
+  }
+  
+  const raw = await res.json();
+  console.log('Order creation response:', raw); // For debugging
+  
+  // Handle response wrapper if needed
+  return raw.data || raw;
+}
+
+export async function fetchOrder(orderNumber: string): Promise<OrderResponse> {
+  if (USE_MOCK) {
+    await delay(200);
+    // In mock mode, we'll try to find it in mock orders or create a plausible response
+    // For now, we'll throw an error if not found in a real scenario
+    throw new Error("Order not found in mock mode");
+  }
+
+  const res = await fetch(`${API_BASE_URL}/orders/${orderNumber}`);
+  
+  if (!res.ok) {
+    if (res.status === 404) {
+      throw new Error("Order not found");
+    }
+    throw new Error("Failed to fetch order");
+  }
+  
+  const raw = await res.json();
+  console.log('Raw order response:', raw);
+
+  const orderData = raw.data || raw;
+  
+  return {
+    orderId: orderData.orderId,
+    orderNumber: orderData.orderNumber,
+    status: orderData.status || "pending_payment",
+    totalAmount: orderData.totalAmount,
+    items: orderData.items || [],
+  };
 }
 // ============ UTILITY FUNCTIONS ============
 
