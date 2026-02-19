@@ -14,9 +14,6 @@ export default function Shop() {
     queryFn: () => fetchProducts(category ?? undefined),
   });
 
-  console.log('Current category:', category);
-  console.log('Products:', products);
-
   return (
     <Layout>
       <div className="container py-6 md:py-10">

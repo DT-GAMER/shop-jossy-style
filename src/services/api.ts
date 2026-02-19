@@ -141,7 +141,6 @@ export async function fetchProducts(category?: string) {
   const params = new URLSearchParams();
 
   if (category) {
-    // Convert from lowercase (used in filter) to uppercase (expected by backend)
     params.append("category", category.toUpperCase());
   }
 
@@ -156,24 +155,37 @@ export async function fetchProducts(category?: string) {
   const raw = await res.json();
 
   const products = Array.isArray(raw) ? raw : raw.data ?? [];
-  console.log('Products response:', products);
 
-  return products.map((p: any) => ({
-    id: p.id,
-    name: p.name,
-    originalPrice: p.originalPrice ? Number(p.originalPrice) : undefined,
-    price: p.sellingPrice || p.price,
-    // Store category in lowercase for consistent comparison in the filter
-    category: p.category?.toLowerCase() || "",
-    description: p.description ?? "",
-    images: Array.isArray(p.images)
-      ? p.images
-      : Array.isArray(p.media)
-        ? p.media.map((item: any) => item.url)
-        : [],
-    stockQuantity: Number(p.quantity || p.available || 0),
-    inStock: Number(p.quantity || p.available || 0) > 0,
-  }));
+  return products.map((p: any) => {
+    // Process media with type information
+    let media: { url: string; type: 'IMAGE' | 'VIDEO' }[] = [];
+    let images: string[] = [];
+    
+    if (Array.isArray(p.media)) {
+      media = p.media.map((item: any) => ({
+        url: item.url,
+        type: item.type || 'IMAGE',
+      }));
+      // For backward compatibility, create images array from IMAGE type media
+      images = media.filter(m => m.type === 'IMAGE').map(m => m.url);
+    } else if (Array.isArray(p.images)) {
+      images = p.images;
+      media = p.images.map((url: string) => ({ url, type: 'IMAGE' }));
+    }
+
+    return {
+      id: p.id,
+      name: p.name,
+      originalPrice: p.originalPrice ? Number(p.originalPrice) : undefined,
+      price: p.sellingPrice || p.price,
+      category: p.category?.toLowerCase() || "",
+      description: p.description ?? "",
+      images: images,
+      media: media, // Include full media info
+      stockQuantity: Number(p.quantity || p.available || 0),
+      inStock: Number(p.quantity || p.available || 0) > 0,
+    };
+  });
 }
 
 // Fetch a single product by ID
@@ -189,29 +201,34 @@ export async function fetchProduct(id: string): Promise<Product> {
   if (!res.ok) throw new Error("Failed to fetch product");
 
   const raw = await res.json();
-  console.log('Raw product data:', raw);
+  
+  const productData = raw.data || raw;
 
-  // Transform the product data to match the expected format
+  // Process media with type information
+  let media: { url: string; type: 'IMAGE' | 'VIDEO' }[] = [];
+  let images: string[] = [];
+  
+  if (Array.isArray(productData.media)) {
+    media = productData.media.map((item: any) => ({
+      url: item.url,
+      type: item.type || 'IMAGE',
+    }));
+    images = media.filter(m => m.type === 'IMAGE').map(m => m.url);
+  } else if (Array.isArray(productData.images)) {
+    images = productData.images;
+    media = productData.images.map((url: string) => ({ url, type: 'IMAGE' }));
+  }
+
   return {
-    id: raw.data.id,
-    name: raw.data.name,
-    price: raw.data.price,
-    category: raw.data.category?.toLowerCase(),
-    description: raw.data.description ?? "",
-    // Transform images/media to array of URL strings
-    images: Array.isArray(raw.data.images)
-      ? raw.data.images
-      : Array.isArray(raw.data.media)
-        ? raw.data.media.map((item: any) => item.url)
-        : [],
-    // Also keep the images array for the component
-    // media: Array.isArray(raw.data.images)
-    //   ? raw.data.images
-    //   : Array.isArray(raw.data.media)
-    //     ? raw.data.media.map((item: any) => item.url)
-    //     : [],
-    stockQuantity: Number(raw.data.available ?? 0),
-    inStock: Number(raw.data.available ?? 0) > 0,
+    id: productData.id,
+    name: productData.name,
+    price: productData.sellingPrice || productData.price,
+    category: productData.category?.toLowerCase(),
+    description: productData.description ?? "",
+    images: images,
+    media: media,
+    stockQuantity: Number(productData.quantity || productData.available || 0),
+    inStock: Number(productData.quantity || productData.available || 0) > 0,
   };
 }
 
@@ -288,7 +305,6 @@ export async function fetchCategories(): Promise<{ value: string; label: string 
   if (!res.ok) throw new Error("Failed to fetch categories");
   
   const raw = await res.json();
-  console.log('📦 Categories response:', raw);
   
   // The backend returns an array of strings directly
   const categoriesData = raw.data || raw;
@@ -356,8 +372,6 @@ export async function createOrder(order: OrderRequest): Promise<OrderResponse> {
     }))
   };
 
-  console.log('Sending order request:', requestBody); // For debugging
-
   const res = await fetch(`${API_BASE_URL}/orders`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -371,7 +385,6 @@ export async function createOrder(order: OrderRequest): Promise<OrderResponse> {
   }
 
   const raw = await res.json();
-  console.log('Order creation response:', raw); // For debugging
 
   // Handle response wrapper if needed
   return raw.data || raw;
@@ -395,7 +408,6 @@ export async function fetchOrder(orderNumber: string): Promise<OrderResponse> {
   }
 
   const raw = await res.json();
-  console.log('Raw order response:', raw);
 
   const orderData = raw.data || raw;
 
@@ -406,6 +418,16 @@ export async function fetchOrder(orderNumber: string): Promise<OrderResponse> {
     totalAmount: orderData.totalAmount,
     items: orderData.items || [],
   };
+}
+
+export async function fetchAccountInfo() {
+  const res = await fetch(`${API_BASE_URL}/public/account-details`);
+  if (!res.ok) throw new Error("Failed to fetch account info");
+  
+  const raw = await res.json();
+
+  const accountData = raw.data;
+  return accountData;
 }
 // ============ UTILITY FUNCTIONS ============
 

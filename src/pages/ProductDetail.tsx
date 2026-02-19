@@ -7,12 +7,13 @@ import Layout from "@/components/Layout";
 import { fetchProduct, formatPrice } from "@/services/api";
 import { useCart } from "@/contexts/CartContext";
 import { CATEGORY_LABELS } from "@/types";
+import MediaRenderer from "@/components/MediaRenderer";
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
   const { addToCart } = useCart();
   const [quantity, setQuantity] = useState(1);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
 
   const { data: product, isLoading } = useQuery({
     queryKey: ["product", id],
@@ -48,19 +49,19 @@ export default function ProductDetail() {
     toast.success(`${product.name} added to cart`);
   };
 
-  // Get images array (handle both 'images' and 'media' properties for compatibility)
-  const images = product.images && product.images.length > 0 
-    ? product.images 
-    : product.media || [];
-  
-  const currentImage = images[currentImageIndex] || "/placeholder-image.jpg";
+  // Get media array with type information
+  const mediaItems = product.media && product.media.length > 0
+    ? product.media
+    : (product.images || []).map(url => ({ url, type: 'IMAGE' as const }));
 
-  const nextImage = () => {
-    setCurrentImageIndex((prev) => (prev + 1) % images.length);
+  const currentMedia = mediaItems[currentMediaIndex] || { url: "/placeholder-image.jpg", type: 'IMAGE' };
+
+  const nextMedia = () => {
+    setCurrentMediaIndex((prev) => (prev + 1) % mediaItems.length);
   };
 
-  const prevImage = () => {
-    setCurrentImageIndex((prev) => (prev - 1 + images.length) % images.length);
+  const prevMedia = () => {
+    setCurrentMediaIndex((prev) => (prev - 1 + mediaItems.length) % mediaItems.length);
   };
 
   return (
@@ -75,53 +76,67 @@ export default function ProductDetail() {
         </Link>
 
         <div className="grid gap-8 md:grid-cols-2">
-          {/* Image Gallery */}
+          {/* Media Gallery */}
           <div className="overflow-hidden rounded-xl bg-muted">
             <div className="relative aspect-square">
-              <img
-                src={currentImage}
+              <MediaRenderer
+                src={currentMedia.url}
+                type={currentMedia.type}
                 alt={product.name}
                 className="h-full w-full object-cover"
+                showControls={true}
               />
-              
-              {images.length > 1 && (
+              {mediaItems.length > 1 && (
                 <>
                   <button
-                    onClick={prevImage}
+                    onClick={prevMedia}
                     className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white transition-colors hover:bg-black/70"
-                    aria-label="Previous image"
+                    aria-label="Previous media"
                   >
                     <ArrowLeft className="h-4 w-4" />
                   </button>
                   <button
-                    onClick={nextImage}
+                    onClick={nextMedia}
                     className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white transition-colors hover:bg-black/70"
-                    aria-label="Next image"
+                    aria-label="Next media"
                   >
                     <ArrowLeft className="h-4 w-4 rotate-180" />
                   </button>
-                  
-                  {/* Image indicators */}
+
+                  {/* Media indicators */}
                   <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 gap-1">
-                    {images.map((_, index) => (
+                    {mediaItems.map((media, index) => (
                       <button
                         key={index}
-                        onClick={() => setCurrentImageIndex(index)}
-                        className={`h-1.5 w-1.5 rounded-full transition-all ${
-                          index === currentImageIndex
+                        onClick={() => setCurrentMediaIndex(index)}
+                        className={`h-1.5 w-1.5 rounded-full transition-all ${index === currentMediaIndex
                             ? "w-4 bg-white"
                             : "bg-white/50 hover:bg-white/80"
-                        }`}
-                        aria-label={`Go to image ${index + 1}`}
+                          }`}
+                        aria-label={`Go to media ${index + 1}`}
                       />
                     ))}
                   </div>
                 </>
               )}
+
+              {/* Video indicator for thumbnails */}
+              {mediaItems.length > 1 && (
+                <div className="absolute top-4 right-4 flex gap-1">
+                  {mediaItems.map((media, index) => (
+                    <div
+                      key={index}
+                      className={`w-2 h-2 rounded-full ${media.type === 'VIDEO' ? 'bg-blue-500' : 'bg-green-500'
+                        }`}
+                      title={media.type === 'VIDEO' ? 'Video' : 'Image'}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Product Details - Rest of your component remains the same */}
+          {/* Product Details */}
           <div className="flex flex-col">
             <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
               {CATEGORY_LABELS[product.category]}

@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import Layout from "@/components/Layout";
 import { OrderResponse, BANK_DETAILS, WHATSAPP_NUMBER } from "@/types";
-import { formatPrice, fetchOrder, fetchProduct } from "@/services/api";
+import { formatPrice, fetchOrder, fetchProduct, fetchAccountInfo } from "@/services/api";
 
 export default function OrderConfirmation() {
   const location = useLocation();
@@ -26,6 +26,21 @@ export default function OrderConfirmation() {
 
   // Use state order if available, otherwise use fetched order
   const order = stateOrder || fetchedOrder;
+
+  const [accountInfo, setAccountInfo] = useState(null);
+
+  useEffect(() => {
+    async function checkAccountInfo() {
+      try {
+        const data = await fetchAccountInfo();
+        setAccountInfo(data);
+      } catch (error) {
+        console.error("Failed to fetch account info:", error);
+        toast.error("Unable to load payment details. Please try again later.");
+      }
+    }
+    checkAccountInfo();
+  }, []);
 
   // Fetch product names for all items
   useEffect(() => {
@@ -182,15 +197,15 @@ export default function OrderConfirmation() {
           <div className="mt-3 space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Bank</span>
-              <span className="font-medium text-secondary-foreground">{BANK_DETAILS.bankName}</span>
+              <span className="font-medium text-secondary-foreground">{accountInfo?.bankName}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Account Name</span>
-              <span className="font-medium text-secondary-foreground">{BANK_DETAILS.accountName}</span>
+              <span className="font-medium text-secondary-foreground">{accountInfo?.accountName}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Account Number</span>
-              <span className="font-medium text-secondary-foreground">{BANK_DETAILS.accountNumber}</span>
+              <span className="font-medium text-secondary-foreground">{accountInfo?.accountNumber}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Amount</span>

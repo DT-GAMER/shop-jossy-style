@@ -1,9 +1,15 @@
+export interface ProductMedia {
+  url: string;
+  type: 'IMAGE' | 'VIDEO';
+}
+
 export interface Product {
   id: string;
   name: string;
   price: number;
   category: string;
   images: string[];
+  media?: ProductMedia[];
   description: string;
   inStock: boolean;
   stockQuantity: number;

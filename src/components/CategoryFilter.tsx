@@ -17,7 +17,6 @@ export default function CategoryFilter({ selected, onSelect }: CategoryFilterPro
   const loadCategories = async () => {
     try {
       const data = await fetchCategories();
-      console.log('📦 Loaded categories:', data);
       setCategories(data);
     } catch (error) {
       console.error("Failed to load categories:", error);

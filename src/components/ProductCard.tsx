@@ -4,6 +4,7 @@ import { formatPrice } from "@/services/api";
 import { ShoppingBag } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { toast } from "sonner";
+import MediaRenderer from "@/components/MediaRenderer";
 
 interface ProductCardProps {
   product: Product;
@@ -15,10 +16,18 @@ const FALLBACK_IMAGE =
 export default function ProductCard({ product }: ProductCardProps) {
   const { addToCart } = useCart();
 
-  const imageSrc =
-    product.images && product.images.length > 0
-      ? product.images[0]
-      : FALLBACK_IMAGE;
+  // Get first media item (image or video)
+  const getFirstMedia = () => {
+    if (product.media && product.media.length > 0) {
+      return product.media[0];
+    }
+    if (product.images && product.images.length > 0) {
+      return { url: product.images[0], type: 'IMAGE' as const };
+    }
+    return { url: FALLBACK_IMAGE, type: 'IMAGE' as const };
+  };
+
+  const firstMedia = getFirstMedia();
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -34,11 +43,12 @@ export default function ProductCard({ product }: ProductCardProps) {
       className="group block overflow-hidden rounded-lg border border-border bg-card transition-shadow hover:shadow-md"
     >
       <div className="relative aspect-square overflow-hidden bg-muted">
-        <img
-          src={imageSrc}
+        <MediaRenderer
+          src={firstMedia.url}
+          type={firstMedia.type}
           alt={product.name}
           className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-          loading="lazy"
+          showControls={false}
         />
 
         {!product.inStock && (
