@@ -54,7 +54,13 @@ export default function Checkout() {
         })),
       });
       clearCart();
-      navigate(`/order-confirmation/${order.orderNumber}`, { state: { order } });
+      navigate(`/order-confirmation/${order.orderNumber}`, { 
+      state: { 
+        order,
+        customerName: result.data.customerName,
+        customerPhone: result.data.customerPhone
+      } 
+    });
     } catch {
       toast.error("Failed to place order. Please try again.");
     } finally {

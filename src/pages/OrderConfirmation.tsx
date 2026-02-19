@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import Layout from "@/components/Layout";
-import { OrderResponse, BANK_DETAILS, WHATSAPP_NUMBER } from "@/types";
+import { OrderResponse, WHATSAPP_NUMBER } from "@/types";
 import { formatPrice, fetchOrder, fetchProduct, fetchAccountInfo } from "@/services/api";
 
 export default function OrderConfirmation() {
@@ -15,6 +15,9 @@ export default function OrderConfirmation() {
   
   // Get order from navigation state if available
   const stateOrder = location.state?.order as OrderResponse | undefined;
+  const customerName = location.state?.customerName as string | undefined;
+  const customerPhone = location.state?.customerPhone as string | undefined;
+
   
   // Fetch order if not in state (e.g., on page refresh)
   const { data: fetchedOrder, isLoading, error } = useQuery({
@@ -118,11 +121,16 @@ export default function OrderConfirmation() {
     .join('\n');
 
   const message = encodeURIComponent(
-    `Hello! I just placed an order.\n\n` +
-    `Order Number: ${order.orderNumber},\n` +
-    `Total: ${formatPrice(order.totalAmount)},\n\n` +
-    `Items Ordered:\n${itemsList},\n\n` +
-    `I have completed the bank transfer. Please confirm.`
+    `Hello, I just placed an order on Jossy-Diva Collections and would like to confirm it.\n\n` +
+    `Order Number: ${order.orderNumber}\n` +
+    `Customer Name: ${customerName}\n` +
+    `Phone Number: ${customerPhone}\n` +
+    `Total Amount: ${formatPrice(order.totalAmount)}\n\n` +
+    `ITEMS ORDERED:\n` +
+    `${itemsList}\n\n` +
+    `I have completed the bank transfer and will send the payment receipt shortly.\n` +
+    `Please confirm once you've received the payment.\n\n` +
+    `Thank you!`
   );
   
   window.open(
