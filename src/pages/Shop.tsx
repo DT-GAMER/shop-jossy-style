@@ -5,15 +5,17 @@ import Layout from "@/components/Layout";
 import ProductCard from "@/components/ProductCard";
 import CategoryFilter from "@/components/CategoryFilter";
 import { fetchProducts } from "@/services/api";
-import { ProductCategory } from "@/types";
 
 export default function Shop() {
-  const [category, setCategory] = useState<ProductCategory | null>(null);
+  const [category, setCategory] = useState<string | null>(null);
 
-  const { data: products, isLoading } = useQuery({
+  const { data: products, isLoading, error } = useQuery({
     queryKey: ["products", category],
     queryFn: () => fetchProducts(category ?? undefined),
   });
+
+  console.log('Current category:', category);
+  console.log('Products:', products);
 
   return (
     <Layout>
@@ -30,6 +32,10 @@ export default function Shop() {
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : error ? (
+          <div className="py-20 text-center">
+            <p className="text-destructive">Error loading products</p>
           </div>
         ) : products && products.length > 0 ? (
           <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">

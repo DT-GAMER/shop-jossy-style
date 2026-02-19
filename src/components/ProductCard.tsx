@@ -62,9 +62,20 @@ export default function ProductCard({ product }: ProductCardProps) {
       <div className="p-3">
         <h3 className="truncate text-sm font-medium">{product.name}</h3>
         <div className="mt-1 flex items-center justify-between">
-          <p className="font-display text-base font-bold text-accent">
-            {formatPrice(product.price)}
-          </p>
+          {product.originalPrice !== undefined && product.originalPrice !== product.price ? (
+            <div className="flex gap-2">
+              <p className="text-xs text-bold line-through text-accent/70 mt-1">
+                {formatPrice(product.originalPrice)}
+              </p>
+              <p className="font-display text-base font-bold text-accent">
+                {formatPrice(product.price)}
+              </p>
+            </div>
+          ) : (
+            <p className="font-display text-base font-bold text-accent">
+              {formatPrice(product.price)}
+            </p>
+          )}
           {product.inStock && (
             <span className="text-xs text-whatsapp">In Stock</span>
           )}

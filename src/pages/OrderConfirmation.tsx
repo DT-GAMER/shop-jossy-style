@@ -103,10 +103,10 @@ export default function OrderConfirmation() {
     .join('\n');
 
   const message = encodeURIComponent(
-    `Hello! I just placed an order.\n\n`
-    `Order Number: ${order.orderNumber},\n`
-    `Total: ${formatPrice(order.totalAmount)},\n\n`
-    `Items Ordered:\n${itemsList},\n\n`
+    `Hello! I just placed an order.\n\n` +
+    `Order Number: ${order.orderNumber},\n` +
+    `Total: ${formatPrice(order.totalAmount)},\n\n` +
+    `Items Ordered:\n${itemsList},\n\n` +
     `I have completed the bank transfer. Please confirm.`
   );
   

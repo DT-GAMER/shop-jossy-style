@@ -137,15 +137,15 @@ function delay(ms: number) {
 
 // ============ PRODUCTS ENDPOINTS ============
 
-export async function fetchProducts(category?: ProductCategory) {
+export async function fetchProducts(category?: string) {
   const params = new URLSearchParams();
 
   if (category) {
+    // Convert from lowercase (used in filter) to uppercase (expected by backend)
     params.append("category", category.toUpperCase());
   }
 
-  const url = `${API_BASE_URL}/public/products${params.toString() ? `?${params}` : ""
-    }`;
+  const url = `${API_BASE_URL}/public/products${params.toString() ? `?${params}` : ""}`;
 
   const res = await fetch(url);
 
@@ -156,21 +156,23 @@ export async function fetchProducts(category?: ProductCategory) {
   const raw = await res.json();
 
   const products = Array.isArray(raw) ? raw : raw.data ?? [];
-  console.log(products)
+  console.log('Products response:', products);
 
   return products.map((p: any) => ({
     id: p.id,
     name: p.name,
-    price: p.price,
-    category: p.category?.toLowerCase(),
+    originalPrice: p.originalPrice ? Number(p.originalPrice) : undefined,
+    price: p.sellingPrice || p.price,
+    // Store category in lowercase for consistent comparison in the filter
+    category: p.category?.toLowerCase() || "",
     description: p.description ?? "",
     images: Array.isArray(p.images)
       ? p.images
       : Array.isArray(p.media)
-        ? p.media.map(item => item.url)
+        ? p.media.map((item: any) => item.url)
         : [],
-    stockQuantity: Number(p.available ?? 0),
-    inStock: Number(p.available ?? 0) > 0,
+    stockQuantity: Number(p.quantity || p.available || 0),
+    inStock: Number(p.quantity || p.available || 0) > 0,
   }));
 }
 
@@ -185,10 +187,10 @@ export async function fetchProduct(id: string): Promise<Product> {
 
   const res = await fetch(`${API_BASE_URL}/public/products/${id}`);
   if (!res.ok) throw new Error("Failed to fetch product");
-  
+
   const raw = await res.json();
   console.log('Raw product data:', raw);
-  
+
   // Transform the product data to match the expected format
   return {
     id: raw.data.id,
@@ -203,11 +205,11 @@ export async function fetchProduct(id: string): Promise<Product> {
         ? raw.data.media.map((item: any) => item.url)
         : [],
     // Also keep the images array for the component
-    media: Array.isArray(raw.data.images)
-      ? raw.data.images
-      : Array.isArray(raw.data.media)
-        ? raw.data.media.map((item: any) => item.url)
-        : [],
+    // media: Array.isArray(raw.data.images)
+    //   ? raw.data.images
+    //   : Array.isArray(raw.data.media)
+    //     ? raw.data.media.map((item: any) => item.url)
+    //     : [],
     stockQuantity: Number(raw.data.available ?? 0),
     inStock: Number(raw.data.available ?? 0) > 0,
   };
@@ -258,16 +260,67 @@ export async function updateProduct(id: string, product: Partial<Product>): Prom
   return res.json();
 }
 
-export async function fetchCategories(): Promise<string[]> {
+export async function fetchCategories(): Promise<{ value: string; label: string }[]> {
   if (USE_MOCK) {
     await delay(200);
-    const categories = [...new Set(MOCK_PRODUCTS.map(p => p.category))];
-    return categories;
+    // Return mock categories matching the backend format
+    return [
+      "MEN_CLOTHINGS",
+      "WOMEN_CLOTHINGS",
+      "MEN_SHOES",
+      "WOMEN_SHOES",
+      "PERFUMES",
+      "SKIN_CARES",
+      "WATCHES",
+      "JEWELRIES",
+      "FASHION_GLASSES",
+      "BAGS",
+      "BODY_SPRAY"
+    ].map(cat => ({
+      value: cat.toLowerCase(),
+      label: cat.split('_').map(word => 
+        word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+      ).join(' '),
+    }));
   }
 
   const res = await fetch(`${API_BASE_URL}/products/categories`);
   if (!res.ok) throw new Error("Failed to fetch categories");
-  return res.json();
+  
+  const raw = await res.json();
+  console.log('📦 Categories response:', raw);
+  
+  // The backend returns an array of strings directly
+  const categoriesData = raw.data || raw;
+  
+  // Transform the array of strings into objects with value and label
+  if (Array.isArray(categoriesData)) {
+    return categoriesData.map((cat: string) => ({
+      value: cat.toLowerCase(),
+      label: cat.split('_').map(word => 
+        word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+      ).join(' '),
+    }));
+  }
+  
+  return [];
+}
+
+// Helper function to get icon for category
+function getCategoryIcon(category: string): string {
+  const iconMap: Record<string, string> = {
+    clothes: '👗',
+    shoes: '👠',
+    perfumes: '🧴',
+    creams: '✨',
+    watches: '⌚',
+    jewelry: '💍',
+    bags: '👜',
+    men_clothings: '👔',
+    women_clothings: '👚',
+    skin_cares: '🧴',
+  };
+  return iconMap[category.toLowerCase()] || '📦';
 }
 
 // ============ ORDERS ENDPOINTS ============
@@ -310,16 +363,16 @@ export async function createOrder(order: OrderRequest): Promise<OrderResponse> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(requestBody),
   });
-  
+
   if (!res.ok) {
     const errorText = await res.text();
     console.error('Order creation failed:', res.status, errorText);
     throw new Error("Failed to create order");
   }
-  
+
   const raw = await res.json();
   console.log('Order creation response:', raw); // For debugging
-  
+
   // Handle response wrapper if needed
   return raw.data || raw;
 }
@@ -333,19 +386,19 @@ export async function fetchOrder(orderNumber: string): Promise<OrderResponse> {
   }
 
   const res = await fetch(`${API_BASE_URL}/orders/${orderNumber}`);
-  
+
   if (!res.ok) {
     if (res.status === 404) {
       throw new Error("Order not found");
     }
     throw new Error("Failed to fetch order");
   }
-  
+
   const raw = await res.json();
   console.log('Raw order response:', raw);
 
   const orderData = raw.data || raw;
-  
+
   return {
     orderId: orderData.orderId,
     orderNumber: orderData.orderNumber,
