@@ -54,9 +54,12 @@ export async function fetchProducts(category?: string) {
       category: p.category?.toLowerCase() || "",
       description: p.description ?? "",
       images: images,
-      media: media, // Include full media info
+      media: media,
       stockQuantity: Number(p.quantity || p.available || 0),
       inStock: Number(p.quantity || p.available || 0) > 0,
+      discountType: p.discountType || null,
+      discountValue: p.discountValue ? Number(p.discountValue) : undefined,
+      discountRemainingSeconds: p.discountRemainingSeconds ? Number(p.discountRemainingSeconds) : undefined,
     };
   });
 }

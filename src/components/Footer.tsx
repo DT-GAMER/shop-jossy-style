@@ -26,7 +26,7 @@ export default function Footer() {
               </a>
               <a href="tel:+2348162187320" className="flex items-center gap-2 hover:opacity-100">
                 <Phone className="h-4 w-4" />
-                +234-816 218 7320
+                +234-808 422 2261
               </a>
               <a
                 href="https://instagram.com/jossydiva_collection"

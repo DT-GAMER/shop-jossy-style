@@ -14,6 +14,9 @@ export interface Product {
   inStock: boolean;
   stockQuantity: number;
   originalPrice?: number;
+  discountRemainingSeconds?: number;
+  discountType?: "PERCENTAGE" | "FIXED";
+  discountValue?: number;
 }
 
 export type ProductCategory = string;

@@ -1,10 +1,11 @@
 import { Link } from "react-router-dom";
 import { Product } from "@/types";
 import { formatPrice } from "@/services/api";
-import { ShoppingBag } from "lucide-react";
+import { ShoppingBag, Clock } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { toast } from "sonner";
 import MediaRenderer from "@/components/MediaRenderer";
+import { useEffect, useState } from "react";
 
 interface ProductCardProps {
   product: Product;
@@ -15,6 +16,45 @@ const FALLBACK_IMAGE =
 
 export default function ProductCard({ product }: ProductCardProps) {
   const { addToCart } = useCart();
+  const [countdown, setCountdown] = useState<string | null>(null);
+
+  const formatCountdown = (seconds: number): string => {
+    if (seconds <= 0) return "00:00:00";
+
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+
+    return [
+      hours.toString().padStart(2, '0'),
+      minutes.toString().padStart(2, '0'),
+      secs.toString().padStart(2, '0')
+    ].join(':');
+  };
+
+  useEffect(() => {
+    if (product.discountRemainingSeconds && product.discountRemainingSeconds > 0) {
+      setCountdown(formatCountdown(product.discountRemainingSeconds));
+
+      const interval = setInterval(() => {
+        setCountdown(prev => {
+          if (!prev) return null;
+
+          const [hours, minutes, seconds] = prev.split(':').map(Number);
+          const totalSeconds = hours * 3600 + minutes * 60 + seconds - 1;
+
+          if (totalSeconds <= 0) {
+            clearInterval(interval);
+            return "00:00:00";
+          }
+
+          return formatCountdown(totalSeconds);
+        });
+      }, 1000);
+
+      return () => clearInterval(interval);
+    }
+  }, [product.discountRemainingSeconds]);
 
   // Get first media item (image or video)
   const getFirstMedia = () => {
@@ -37,6 +77,12 @@ export default function ProductCard({ product }: ProductCardProps) {
     toast.success(`${product.name} added to cart`);
   };
 
+
+  // Check if this is a discounted product (has originalPrice and it's different from price)
+  const hasDiscount = product.originalPrice !== undefined && 
+                      product.originalPrice !== product.price && 
+                      product.originalPrice > product.price;
+
   return (
     <Link
       to={`/product/${product.id}`}
@@ -50,6 +96,23 @@ export default function ProductCard({ product }: ProductCardProps) {
           className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
           showControls={false}
         />
+
+        {/* Countdown Timer Badge */}
+        {countdown && countdown !== "00:00:00" && (
+          <div className="absolute left-3 top-3 rounded-full bg-accent px-3 py-1.5 text-xs font-bold text-destructive-foreground flex items-center gap-1.5 shadow-lg">
+            <Clock className="h-3 w-3" />
+            <span>{countdown}</span>
+          </div>
+        )}
+
+        {hasDiscount && countdown && countdown !== "00:00:00" && (
+          <div className="absolute left-3 top-14 rounded-full bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground">
+            {product.discountType === 'FIXED' 
+              ? `₦${product.discountValue} off`
+              : `${product.discountValue}% off`
+            }
+          </div>
+        )}
 
         {!product.inStock && (
           <div className="absolute inset-0 flex items-center justify-center bg-foreground/50">
@@ -72,9 +135,9 @@ export default function ProductCard({ product }: ProductCardProps) {
       <div className="p-3">
         <h3 className="truncate text-sm font-medium">{product.name}</h3>
         <div className="mt-1 flex items-center justify-between">
-          {product.originalPrice !== undefined && product.originalPrice !== product.price ? (
-            <div className="flex gap-2">
-              <p className="text-xs text-bold line-through text-accent/70 mt-1">
+          {hasDiscount ? (
+            <div className="flex items-center gap-2">
+              <p className="text-xs text-bold line-through text-accent/70">
                 {formatPrice(product.originalPrice)}
               </p>
               <p className="font-display text-base font-bold text-accent">
