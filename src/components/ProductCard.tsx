@@ -16,7 +16,8 @@ const FALLBACK_IMAGE =
 
 export default function ProductCard({ product }: ProductCardProps) {
   const { addToCart } = useCart();
-  const [countdown, setCountdown] = useState<string | null>(null);
+  const [timeDisplay, setTimeDisplay] = useState<string | null>(null);
+  const [displayMode, setDisplayMode] = useState<'days' | 'countdown' | null>(null);
 
   const formatCountdown = (seconds: number): string => {
     if (seconds <= 0) return "00:00:00";
@@ -32,29 +33,62 @@ export default function ProductCard({ product }: ProductCardProps) {
     ].join(':');
   };
 
+  const formatDaysRemaining = (seconds: number): string => {
+    const days = Math.ceil(seconds / 86400); // 86400 seconds in a day
+    return `${days} day${days > 1 ? 's' : ''} left`;
+  };
+
   useEffect(() => {
     if (product.discountRemainingSeconds && product.discountRemainingSeconds > 0) {
-      setCountdown(formatCountdown(product.discountRemainingSeconds));
+      // Determine initial display mode
+      if (product.discountRemainingSeconds > 86400) { // More than 24 hours
+        setDisplayMode('days');
+        setTimeDisplay(formatDaysRemaining(product.discountRemainingSeconds));
+      } else {
+        setDisplayMode('countdown');
+        setTimeDisplay(formatCountdown(product.discountRemainingSeconds));
+      }
 
       const interval = setInterval(() => {
-        setCountdown(prev => {
+        setTimeDisplay(prev => {
           if (!prev) return null;
 
-          const [hours, minutes, seconds] = prev.split(':').map(Number);
-          const totalSeconds = hours * 3600 + minutes * 60 + seconds - 1;
+          // Get current seconds remaining
+          const currentSeconds = (() => {
+            if (displayMode === 'days') {
+              // Parse days from string like "X days left"
+              const days = parseInt(prev.split(' ')[0]);
+              return days * 86400;
+            } else {
+              // Parse from countdown format "HH:MM:SS"
+              const [hours, minutes, seconds] = prev.split(':').map(Number);
+              return hours * 3600 + minutes * 60 + seconds;
+            }
+          })();
 
-          if (totalSeconds <= 0) {
+          const newSeconds = currentSeconds - 1;
+
+          if (newSeconds <= 0) {
             clearInterval(interval);
             return "00:00:00";
           }
 
-          return formatCountdown(totalSeconds);
+          // Switch to countdown mode if crossing below 24 hours
+          if (displayMode === 'days' && newSeconds <= 86400) {
+            setDisplayMode('countdown');
+            return formatCountdown(newSeconds);
+          }
+
+          // Continue in current mode
+          return displayMode === 'days' 
+            ? formatDaysRemaining(newSeconds)
+            : formatCountdown(newSeconds);
         });
       }, 1000);
 
       return () => clearInterval(interval);
     }
-  }, [product.discountRemainingSeconds]);
+  }, [product.discountRemainingSeconds, displayMode]);
 
   // Get first media item (image or video)
   const getFirstMedia = () => {
@@ -77,7 +111,6 @@ export default function ProductCard({ product }: ProductCardProps) {
     toast.success(`${product.name} added to cart`);
   };
 
-
   // Check if this is a discounted product (has originalPrice and it's different from price)
   const hasDiscount = product.originalPrice !== undefined && 
                       product.originalPrice !== product.price && 
@@ -97,15 +130,16 @@ export default function ProductCard({ product }: ProductCardProps) {
           showControls={false}
         />
 
-        {/* Countdown Timer Badge */}
-        {countdown && countdown !== "00:00:00" && (
+        {/* Time Display Badge (Days or Countdown) */}
+        {timeDisplay && timeDisplay !== "00:00:00" && (
           <div className="absolute left-3 top-3 rounded-full bg-accent px-3 py-1.5 text-xs font-bold text-destructive-foreground flex items-center gap-1.5 shadow-lg">
             <Clock className="h-3 w-3" />
-            <span>{countdown}</span>
+            <span>{timeDisplay}</span>
           </div>
         )}
 
-        {hasDiscount && countdown && countdown !== "00:00:00" && (
+        {/* Discount Percentage Badge */}
+        {hasDiscount && timeDisplay && timeDisplay !== "00:00:00" && (
           <div className="absolute left-3 top-14 rounded-full bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground">
             {product.discountType === 'FIXED' 
               ? `₦${product.discountValue} off`
